@@ -24,10 +24,11 @@ Extract it somewhere, then run:
 
 import re
 import requests
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 import sys
 import tqdm
 from pathlib import Path
+from functools import partial
 
 
 BAD_FILES = [
@@ -36,27 +37,28 @@ BAD_FILES = [
 ]
 
 
-def process_file(filepath, pool):
+def process_file(filepath, pool, post_id_chunk):
     with filepath.open() as source_file:
         # count lines first
         lines = sum(1 for line in source_file) 
         source_file.seek(0)
 
-        for _ in tqdm.tqdm(pool.imap_unordered(process_line, source_file), total=lines, desc=filepath.name):
+        for _ in tqdm.tqdm(pool.imap_unordered(partial(process_line, post_id_chunk=post_id_chunk), source_file), total=lines, desc=filepath.name):
             pass
 
 
-def process_line(line):
+def process_line(line, post_id_chunk):
     if regex.search(line) is not None:
-        # get the post ID - the only int in the first 20 chars is the ID
-        post_id = ''.join(filter(lambda c: c.isdigit(), line[:20]))
+        # get the post ID - this is the int in the post_id_chunk-th chunk
+        raw_post_id = line.split(maxsplit=post_id_chunk+1)[post_id_chunk]
+        post_id = ''.join(filter(lambda c: c.isdigit(), raw_post_id))
         print(f'https://askubuntu.com/q/{post_id}/')
 
 
 if __name__ == "__main__":
     try:
         dumpdir = Path(sys.argv[1])
-        if not (dumpdir.exists() and dumpdir.is_dir()):
+        if not (dumpdir.exists() and dumpdir.is_dir() and (dumpdir / 'Posts.xml').exists()):
             raise IndexError()
     except IndexError:
         sys.stderr.write('Missing path to dump dir!\n')
@@ -66,6 +68,6 @@ if __name__ == "__main__":
     regexes = '\n'.join(requests.get(url).text for url in BAD_FILES)
     regex = re.compile('|'.join(f'({reg})' for reg in regexes.split('\n') if reg), re.I)
 
-    pool = Pool(cpu_count() - 1)
-    process_file(dumpdir / 'Posts.xml', pool)
-    # process_file(dumpdir / 'Comments.xml'), pool)
+    pool = Pool()
+    process_file(dumpdir / 'Posts.xml', pool, post_id_chunk=1)
+    # process_file(dumpdir / 'Comments-test.xml', pool, post_id_chunk=2)
