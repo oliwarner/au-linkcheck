@@ -64,7 +64,9 @@ if __name__ == "__main__":
         sys.stderr.write('Missing path to dump dir!\n')
         sys.exit(1)
 
-
+    # We start by turning the Smoke Detector lists into one big
+    # regex from hell: (keyword)|(keyword2)|...
+    # There's certainly a better way to do this! There has to be. PR please!
     regexes = '\n'.join(requests.get(url).text for url in BAD_FILES)
     regex = re.compile('|'.join(f'({reg})' for reg in regexes.split('\n') if reg), re.I)
 
