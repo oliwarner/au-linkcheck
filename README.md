@@ -1,5 +1,11 @@
 # Ask Ubuntu linkcheck.py
 
+> **Update**: A simple grep might be better. Use my converted blacklist
+>
+>     cat ../{Post,Comment}s.xml | tr A-Z a-z | grep -Ff smokey/blacklisted_websites.txt
+> 
+> Clocks in at under 16 seconds. The Python version may have a second life with some API-based link checking but for now, I'm stopping development. PRs accepted.
+
 The aim of this little script is simple: check to make sure that old posts don't have links to crappy old domains and URLs in them. Many of these are detected after the fact [citation needed] and while Smoke Detector (et al) do a fine job with new posts and edits, they're no good helping us take out the trash.
 
 > **Disclaimer**: As always, focus should be on dealing with new questions, not letting them rot while we clear up the old rubbish, but this seemed like a genuine hole in the way we handle things. A fun little programming project, regardless.
