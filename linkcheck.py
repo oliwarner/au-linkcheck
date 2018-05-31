@@ -1,4 +1,4 @@
-#!/snap/bin/pypy3
+#!/usr/bin/env python3
 '''
 linkcheck - scours old posts for bad domains (et al)
 
@@ -9,32 +9,18 @@ modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
+Depends on Python 3.6 with requests and tqdm libraries.
 
-This NEEDS pypy to run at any sort of decent speed.
-
-    sudo snap install pypy3 --classic
-    pypy3 -m ensurepip --user
-    pypy3 -m pip --user install requests tqdm
-
-Download the dumps from https://archive.org/download/stackexchange  
-Extract it somewhere, then run:
-
-    /snap/bin/pypy3 linkcheck.py /path/to/dump/dir
+    sudo apt install python3-{requests,tqdm}
+    python3 linkcheck.py /path/to/dump/dir
 '''
 
-import re
 import requests
 from multiprocessing import Pool
 import sys
 import tqdm
 from pathlib import Path
 from functools import partial
-
-
-BAD_FILES = [
-    'https://raw.githubusercontent.com/Charcoal-SE/SmokeDetector/master/blacklisted_websites.txt',
-    # 'https://raw.githubusercontent.com/Charcoal-SE/SmokeDetector/master/bad_keywords.txt',  # disabled for speed
-]
 
 
 def process_file(filepath, pool, post_id_chunk):
@@ -48,11 +34,19 @@ def process_file(filepath, pool, post_id_chunk):
 
 
 def process_line(line, post_id_chunk):
-    if regex.search(line) is not None:
+    line = line.lower()
+
+    if 'http' not in line:
+        return
+
+    for bad_domain in bad_domains:
+        if bad_domain not in line:
+            continue
+
         # get the post ID - this is the int in the post_id_chunk-th chunk
         raw_post_id = line.split(maxsplit=post_id_chunk+1)[post_id_chunk]
         post_id = ''.join(filter(lambda c: c.isdigit(), raw_post_id))
-        print(f'https://askubuntu.com/q/{post_id}/')
+        print(f'https://askubuntu.com/q/{post_id}/\t{bad_domain}')
 
 
 if __name__ == "__main__":
@@ -64,12 +58,11 @@ if __name__ == "__main__":
         sys.stderr.write('Missing path to dump dir!\n')
         sys.exit(1)
 
-    # We start by turning the Smoke Detector lists into one big
-    # regex from hell: (keyword)|(keyword2)|...
-    # There's certainly a better way to do this! There has to be. PR please!
-    regexes = '\n'.join(requests.get(url).text for url in BAD_FILES)
-    regex = re.compile('|'.join(f'({reg})' for reg in regexes.split('\n') if reg), re.I)
+    # Read in the blacklisted_websites
+    # This is modified from the Smoke Detector
+    with (Path(__file__).parent / 'smokey/blacklisted_websites.txt').open() as f:
+        bad_domains = f.read().lower().splitlines()
 
     pool = Pool()
     process_file(dumpdir / 'Posts.xml', pool, post_id_chunk=1)
-    # process_file(dumpdir / 'Comments-test.xml', pool, post_id_chunk=2)
+    process_file(dumpdir / 'Comments.xml', pool, post_id_chunk=2)
